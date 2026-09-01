@@ -27,6 +27,7 @@ struct App {
     baseline: Option<f64>,
     error: Option<String>,
     initialized: bool,
+    last_refresh: std::time::Instant,
 }
 
 impl Default for App {
@@ -37,6 +38,7 @@ impl Default for App {
             baseline: load_baseline(),
             error: None,
             initialized: false,
+            last_refresh: std::time::Instant::now(),
         }
     }
 }
@@ -151,6 +153,7 @@ fn mask_key(key: &str) -> String {
 
 impl App {
     fn refresh(&mut self) {
+        self.last_refresh = std::time::Instant::now();
         self.error = None;
         let key = self.api_key.trim().to_string();
         match query_balance(&key) {
@@ -186,6 +189,16 @@ impl eframe::App for App {
             if !self.api_key.trim().is_empty() {
                 self.refresh();
             }
+        }
+
+        if self.balance.is_some() {
+            let elapsed = self.last_refresh.elapsed();
+            if elapsed >= std::time::Duration::from_secs(30) {
+                self.refresh();
+            }
+            let remain = std::time::Duration::from_secs(30)
+                .saturating_sub(self.last_refresh.elapsed());
+            ctx.request_repaint_after(remain);
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
